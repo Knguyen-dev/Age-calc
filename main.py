@@ -1,32 +1,4 @@
-'''
-Write a program that prompts the user for a date (mm/dd/yyyy) format, could be their birthday, and a second date,
-assume the second date is chronologically later than the first date. Then have the program display the time difference
-between these dates, in years (add floats), months (add floats), and days (add floats) individually for each.
-It would be like: 3.54 years or something odd months, but it's only one type.
-
-Then display them all together in total like e.g. 3 years 2 months and 16 days.
-+ Year transition (assuming we need to go through years):
-- Get our starting year, if it's a leap year, then check if the leap month of february is triggered. 
-Outcome 1: Not triggered as July 5, 2004 - July 5, 2005; 365 days as 2004's february wasn't triggered; we started in a leap
-year, but July 5 was before February 28. If the date starts any earlier than Feb 29, then you have 365. 
-
-
-Outcome 2: Triggered as January 25, 2004 - January 25, 2005, since you started in a leap year and your month
-is January, which is before February 28; 366 days
-
-
-- Getting to the leap year: 
-E.g. April 5, 2007 - April 5, 2008
-Outcome 1: The year being transitioned into is a leap year, or a year after the starting year is a leap year. Then
-check the month => April is AFTER February, so that means february leap will be triggered; 366 days
-
-E.g. February 16, 2007 - February 16, 2008
-Outcome 2: The year being transitioned into is a leap year, or a year after the starting is a leap year, same situation.
-Let's check the month again, the month is February, which means it's before Feb 29 and months after; So in conclusion
-since we are transitioning into leap year, and the month is before March or Feb 29; we only get 365 days
-
-note: If we have February 29, 2004 and we plus one year, it need to be February 28, 2005; 365 days
-'''
+import math
 MONTHS = [
   {
     'name': 'January',
@@ -99,23 +71,85 @@ class Date:
         result = False;
     return result
 
+  # Used when you have the same months situation
+  @staticmethod
+  def find_days(startDay, endDay):
+    if (startDay > endDay):
+      days = -1 * (endDay - startDay)
+    else:
+      # startDay <= endDay
+      days = (endDay - startDay)
+    return days
+        
+
+  @staticmethod
+  def find_month_gaps(startMonthIndex, endMonthIndex, cross_years = True):
+    # turn the years into days; now find num months in between September 2021, [month] [last completed year] and June 2022 [end month] [end year]
+    # Start at [start month] [last completed year] to the end of the year or [current year]
+    numDays = 0
+    numMonths = 0
+    if (cross_years):
+      while (startMonthIndex < 11):
+        numMonths += 1
+        startMonthIndex += 1
+      # Gets amount of months from January to the [end month] [current year]
+      while (endMonthIndex >= 0):
+        numMonths += 1
+        endMonthIndex -= 1
+    else:
+      # Well what if there is no month gap?, then we need to just find the amount of days
+      for month in range(startMonthIndex, endMonthIndex):
+        numMonths += 1
+    # Average number of days in the gap of the months 
+    numDays = (365.25 / 12) * numMonths
+    return numDays
+
   @staticmethod
   def getDifferenceTime(startDate, endDate):
-    endYear = endDate.y
-    endMonth = endDate.m
+    startDay = startDate.d
     endDay = endDate.d
-    currentDay = startDate.d
-    currentMonth = startDate.m
-    currentYear = startDate.y
-    diff = 0 
-    currentMonthIndex = currentMonth - 1
+    diff_years = 0 
+    diff_days = 0
+    startMonthIndex = startDate.m - 1
     endMonthIndex = endDate.m - 1
-    print(f'Starting at: {currentMonth}:{currentDay}:{currentYear}')
+    # If it crosses over different years, then subtract the number of complete years
+    # Example: Sept 15, 1970 => June 15th 2022
+    # Example: October 7 2003 => December 15, 2009
+    # Check the month (using indices) to see the amount of complete years; September 15, 2022 isn't there, so 2022 isn't a complete year
+    # For the second one, you know October 7, 2009 exists, so 2009 - 2003 is 6 years 
+    # If it crosses over years then, let's calculate the difference in years
+    if (endDate.y > startDate.y):
+      if (startMonthIndex < endMonthIndex):
+        # Find full difference in years
+        # Find approximate amount of days in those complete years
+        # Then add the amount of days in the month gaps 
+        diff_years = endDate.y - startDate.y
+        diff_days = 365.25 * diff_years
+        diff_days += Date.find_month_gaps(startMonthIndex, endMonthIndex)
+      elif (startMonthIndex > endMonthIndex):
+        diff_years = (endDate.y - 1) - startDate.y #Minus 1 year when calculating difference because the year hasn't been reached yet
+        diff_days = 365.25 * diff_years
+        diff_days += Date.find_month_gaps(startMonthIndex, endMonthIndex)
+      else:
+        '''
+        - this means they are different years, but the same months
+        - Like October 4, 2004 to October 16, 2011; since end day is bigger than start day, we can subtract directly 2011 - 2005; then directly doing the days is possible
+        - Like october 16, 2004 to October 3, 2007; since start day is bigger than end day, then (2011 - 2005) to get => October 16, 2007 (then you would get the difference 13 days and subtract 16 - 13 to get final);
+        '''
+        # Get the difference in years, but then adjust the amount of days
+        diff_years = endDate.y - startDate.y
+        diff_days += Date.find_days(startDay, endDay)        
+      # Find average number of days in a month (365.25 / 12)
+      # Multiply that by the gaps of the months so that we get the number of days in the month gap
+      # Then round 
+    else:
+      # This would mean the years are the same so you would have to find months and days 
+      # Almost, but this function only calculates the number of months across years, so we need something to calculate months across the same years
+      diff_days = Date.find_month_gaps(startMonthIndex, endMonthIndex, False) 
+      diff_days += Date.find_days(startDay, endDay)
 
-    
-    
-    print(f"{currentMonth}:{currentDay}:{currentYear}")
-    return diff
+    diff_days = math.floor(diff_days)
+    return diff_days
         
 def getDate():
   date = input('Enter first date in mm/dd/yyyy: ');
@@ -132,19 +166,22 @@ def getDate():
 
 
 
-# FIRST_DATE = Date('07', '03', '2004');
-# SECOND_DATE = Date('07', '03', '2009');
-# FIRST_DATE = Date('02', '03', '2004');
-# SECOND_DATE = Date('02', '03', '2010');
-# FIRST_DATE = Date('02', '29', '2004');
-# SECOND_DATE = Date('02', '28', '2010');
-FIRST_DATE = Date('02', '29', '2004');
-SECOND_DATE = Date('01', '29', '2010');
+a = Date('09', '5', '1970')
+b = Date('06', '22', '2022')
+c = Date('01', '4', '2004')
+d = Date('03', '15', '2004')
+e = Date('07', '03', '2004');
+f = Date('07', '03', '2009');
+g = Date('02', '03', '2004');
+h = Date('02', '03', '2010');
+i = Date('02', '29', '2004');
+j = Date('02', '28', '2010');
+k = Date('01', '15', '2002');
+l = Date('12', '28', '2021');
 
-difference_in_days = Date.getDifferenceTime(FIRST_DATE, SECOND_DATE)
-print(f"Difference: {difference_in_days} days ")
-
-
-
-
-
+print(Date.getDifferenceTime(a, b))
+print(Date.getDifferenceTime(c, d))
+print(Date.getDifferenceTime(e, f))
+print(Date.getDifferenceTime(g, h))
+print(Date.getDifferenceTime(i, j))
+print(Date.getDifferenceTime(k, l))
