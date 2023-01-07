@@ -54,8 +54,10 @@ class Date:
     self.m = int(m);
     self.d = int(d);
     self.y = int(y);
+  
   def __repr__(self):
     return f"month: {self.m}\nday: {self.d}\nyear: {self.y}"
+  
   @staticmethod
   def checkLeapYear(year):
     result = True;
@@ -70,86 +72,120 @@ class Date:
       if (year % 100 == 0 and year % 400 != 0):
         result = False;
     return result
-
-  # Used when you have the same months situation
-  @staticmethod
-  def find_days(startDay, endDay):
-    if (startDay > endDay):
-      days = -1 * (endDay - startDay)
-    else:
-      # startDay <= endDay
-      days = (endDay - startDay)
-    return days
-        
-
-  @staticmethod
-  def find_month_gaps(startMonthIndex, endMonthIndex, cross_years = True):
-    # turn the years into days; now find num months in between September 2021, [month] [last completed year] and June 2022 [end month] [end year]
-    # Start at [start month] [last completed year] to the end of the year or [current year]
-    numDays = 0
-    numMonths = 0
-    if (cross_years):
-      while (startMonthIndex < 11):
-        numMonths += 1
-        startMonthIndex += 1
-      # Gets amount of months from January to the [end month] [current year]
-      while (endMonthIndex >= 0):
-        numMonths += 1
-        endMonthIndex -= 1
-    else:
-      # Well what if there is no month gap?, then we need to just find the amount of days
-      for month in range(startMonthIndex, endMonthIndex):
-        numMonths += 1
-    # Average number of days in the gap of the months 
-    numDays = (365.25 / 12) * numMonths
-    return numDays
-
+  
   @staticmethod
   def getDifferenceTime(startDate, endDate):
-    startDay = startDate.d
     endDay = endDate.d
-    diff_years = 0 
-    diff_days = 0
-    startMonthIndex = startDate.m - 1
+    currentDay = startDate.d
+    currentYear = startDate.y
+    diff = 0 
+    currentMonthIndex = startDate.m - 1
     endMonthIndex = endDate.m - 1
-    # If it crosses over different years, then subtract the number of complete years
-    # Example: Sept 15, 1970 => June 15th 2022
-    # Example: October 7 2003 => December 15, 2009
-    # Check the month (using indices) to see the amount of complete years; September 15, 2022 isn't there, so 2022 isn't a complete year
-    # For the second one, you know October 7, 2009 exists, so 2009 - 2003 is 6 years 
-    # If it crosses over years then, let's calculate the difference in years
-    if (endDate.y > startDate.y):
-      if (startMonthIndex < endMonthIndex):
-        # Find full difference in years
-        # Find approximate amount of days in those complete years
-        # Then add the amount of days in the month gaps 
-        diff_years = endDate.y - startDate.y
-        diff_days = 365.25 * diff_years
-        diff_days += Date.find_month_gaps(startMonthIndex, endMonthIndex)
-      elif (startMonthIndex > endMonthIndex):
-        diff_years = (endDate.y - 1) - startDate.y #Minus 1 year when calculating difference because the year hasn't been reached yet
-        diff_days = 365.25 * diff_years
-        diff_days += Date.find_month_gaps(startMonthIndex, endMonthIndex)
+    #The magical floating number is (365.25 / 12)
+    AVERAGE_DAYS_PER_MONTH = 30.4375
+    for year in range(startDate.y, endDate.y):
+      next_leap = Date.checkLeapYear(year + 1)
+      current_leap = Date.checkLeapYear(year)
+      if (year == startDate.y):
+        '''
+        - If the first year is a leap year, then if the start date is after february 29th, then getting to the exact same day or time next year would be 365 days. For feb29th to feb28 next year would be 365 days
+        - However, 365 days after feb 29th, would be feb 28th, which we would need to change on the startDay. This will be important later when we are exactly getting the days
+        - Else if you are starting on Feb 28th or earlier on a leap year, then transitioning to the next year it would go through feb 29th, hence adding that extra day in the year
+        '''
+        if (current_leap): #if the starting year is a leap year
+          if (currentMonthIndex > 1):
+            days_added = 365
+          elif (currentMonthIndex == 1 and currentDay == 29):
+            days_added = 365
+            currentDay = 28
+          else:
+            days_added = 366
+        else:
+          days_added = 365
       else:
         '''
-        - this means they are different years, but the same months
-        - Like October 4, 2004 to October 16, 2011; since end day is bigger than start day, we can subtract directly 2011 - 2005; then directly doing the days is possible
-        - Like october 16, 2004 to October 3, 2007; since start day is bigger than end day, then (2011 - 2005) to get => October 16, 2007 (then you would get the difference 13 days and subtract 16 - 13 to get final);
+        - For all years after the starting year
+        - Check if the next year is a leap year, and if the current year is a leap year; only one of these will be true
+        - If the next year is a leap year, then transitioning to the next year may have us pass feb 29th, hence adding the extra year
+        - In these cases, again we check the months to see how many days we are adding 
+        + Note: If we start feb 29th, it will be converted to feb 28th, and then if another leap occurs then it will transition to feb 29th
         '''
-        # Get the difference in years, but then adjust the amount of days
-        diff_years = endDate.y - startDate.y
-        diff_days += Date.find_days(startDay, endDay)        
-      # Find average number of days in a month (365.25 / 12)
-      # Multiply that by the gaps of the months so that we get the number of days in the month gap
-      # Then round 
-    else:
-      # This would mean the years are the same so you would have to find months and days 
-      # Almost, but this function only calculates the number of months across years, so we need something to calculate months across the same years
-      diff_days = Date.find_month_gaps(startMonthIndex, endMonthIndex, False) 
-      diff_days += Date.find_days(startDay, endDay)
+        if (next_leap):
+          '''
+          - when it's january/february, then it's  not going to pass leap month for the leap year because your max is feb 28
+          - Example: january 16, 2007 => january 16, 2008 will only be 365 days passed
+          - Example February 28, 2007 => February 29, 2008 will only be 366 days
+          - This would mean it's february 28 2003 => february 29, 2004, so 366 days would pass
+          - Like Feb 19, 2003 => Feb 19, 2004; the startDate wouldn't change here because again, adding 365 will leave you with the same thing
+          '''
+          if (currentMonthIndex <= 1): 
+            if (currentMonthIndex == 1 and currentDay == 28): 
+              days_added = 366
+              currentDay = 29
+            else:
+              days_added = 365
+          else: 
+            #Else if we are transitioning into a leap year and the month is after February then the leap year will trigger
+            # Example: April 3, 2007 => April 3, 2008 will take 366 days
+            days_added = 366
+        elif (current_leap):
+          # If the next year isn't a leap year, then check if the current year is a leap year
+          if (currentMonthIndex <= 1):          
+            # Example: Feb 15, 2008 => Feb 15, 2009
+            # 366 days because the leap month is activated in the months of january/february, except for february 29th as startDate
+            # IF given is feb29 it should be already converted to 28th at this point
+            # Example: February 29, 2004 => February 28, 2005; here the leap day isn't counted
+            # However all dates before it, it will count because it passes that February 28 - February 29 barrier
+            if (currentMonthIndex == 1 and currentDay == 29):
+              days_added = 365
+              currentDay = 28
+            else: 
+              days_added = 366
+          else:
+            # Else if the current year is a leap year, then and it's after February, then we are not triggering the leap day
+            # Example: March 1, 2008 => March 1, 2009;
+            days_added = 365
+        else:
+          # This means that the current year and the next year are not leap years
+          # So the year in between is a normal year
+          # Example: January 25, 2006 => January 25, 2007
+          days_added = 365
 
-    diff_days = math.floor(diff_days)
-    return diff_days
+
+      diff += days_added
+      currentYear += 1
+    '''
+    - At this point year is finished    
+    + Now let's transition the months
+    - To transition the months we will need to use startMonthIndex again
+    Example: May, 24, 2002 to October 15, 2010
+    Step 1: Transition years => May 24, 2010
+    Step 2: Transition months => October 24, 2010; an estimation
+    Step 3: Transition days => October 15, 2010; 
+    '''
+
+    # Loop that adds transitions through the months; for each month we transition into we add an average amount of days to our difference, in order to approximate the actual amount of days being passed through
+    # each month
+    while (currentMonthIndex != endMonthIndex):
+      if (currentMonthIndex > endMonthIndex):
+        diff -= AVERAGE_DAYS_PER_MONTH
+        currentMonthIndex -= 1
+      else:
+        if (currentMonthIndex < endMonthIndex):
+          diff += AVERAGE_DAYS_PER_MONTH
+          currentMonthIndex += 1
+
+    # Loop to narrow down the days
+    while (currentDay != endDay):
+      if (currentDay > endDay):
+        diff -= 1
+        currentDay -= 1
+      else:
+        if (currentDay < endDay):
+          diff += 1
+          currentDay += 1
+    
+    return math.floor(diff)
         
 def getDate():
   date = input('Enter first date in mm/dd/yyyy: ');
@@ -164,24 +200,12 @@ def getDate():
   month, day, year = dateComponents
   return Date(month, day, year);
 
+FIRST_DATE = Date('03', '03', '1980');
+SECOND_DATE = Date('12', '17', '2020');
+difference_in_days = Date.getDifferenceTime(FIRST_DATE, SECOND_DATE)
+print(f"Difference: {difference_in_days} days ")
 
 
-a = Date('09', '5', '1970')
-b = Date('06', '22', '2022')
-c = Date('01', '4', '2004')
-d = Date('03', '15', '2004')
-e = Date('07', '03', '2004');
-f = Date('07', '03', '2009');
-g = Date('02', '03', '2004');
-h = Date('02', '03', '2010');
-i = Date('02', '29', '2004');
-j = Date('02', '28', '2010');
-k = Date('01', '15', '2002');
-l = Date('12', '28', '2021');
 
-print(Date.getDifferenceTime(a, b))
-print(Date.getDifferenceTime(c, d))
-print(Date.getDifferenceTime(e, f))
-print(Date.getDifferenceTime(g, h))
-print(Date.getDifferenceTime(i, j))
-print(Date.getDifferenceTime(k, l))
+
+
